@@ -3,6 +3,9 @@
 
 # Configuration file for JupyterHub
 import os
+import re
+import unicodedata
+from oauthenticator.azuread import AzureAdOAuthenticator
 
 c = get_config()  # noqa: F821
 
@@ -46,13 +49,29 @@ c.JupyterHub.hub_port = 8080
 c.JupyterHub.cookie_secret_file = "/data/jupyterhub_cookie_secret"
 c.JupyterHub.db_url = "sqlite:////data/jupyterhub.sqlite"
 
-# Authenticate users with Native Authenticator
-c.JupyterHub.authenticator_class = "nativeauthenticator.NativeAuthenticator"
+# custom authentication 
+class NormalizedUsernameLocalAzureAdOAuthenticator(AzureAdOAuthenticator):
 
-# Allow anyone to sign-up without approval
-c.NativeAuthenticator.open_signup = True
+    def normalize_username(self, username):
+        username = username.lower()[0:32]
+        username = unicodedata.normalize('NFD', username).encode('ascii','ignore').decode("utf-8")
+        username = re.sub(r'\W+', '', username)
+        return username
 
-# Allowed admins
-admin = os.environ.get("JUPYTERHUB_ADMIN")
-if admin:
-    c.Authenticator.admin_users = [admin]
+c.JupyterHub.authenticator_class = NormalizedUsernameLocalAzureAdOAuthenticator
+c.Authenticator.admin_users = "[]"
+c.Authenticator.allowed_users = "[]"
+
+# custom config
+c.DockerSpawner.port = 5001
+
+# ssl
+c.JupyterHub.ssl_key = '/etc/letsencrypt/live/[]/privkey.pem'
+c.JupyterHub.ssl_cert = '/etc/letsencrypt/live/[]/fullchain.pem'
+
+# Azure AD
+c.AzureAdOAuthenticator.tenant_id = "[]"
+c.AzureAdOAuthenticator.client_id = "[]"
+c.AzureAdOAuthenticator.client_secret = "[]"
+c.AzureAdOAuthenticator.oauth_callback_url = "https://[]/hub/oauth_callback"
+c.AzureAdOAuthenticator.allow_existing_users = False
